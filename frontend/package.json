@@ -67,6 +67,11 @@
     },
     "linux": {
       "target": "AppImage"
+    },
+    "appImage": {
+      "executableArgs": [
+        "--no-sandbox"
+      ]
     }
   }
 }
