@@ -1,1 +1,29 @@
-"use strict";var e=require("electron"),s={listServerShares:n=>e.ipcRenderer.invoke("list-server-shares",n),analyzeDirectory:n=>e.ipcRenderer.invoke("analyze-directory",n),expandNode:(n,r)=>e.ipcRenderer.invoke("expand-node",n,r),cancelOperation:()=>e.ipcRenderer.invoke("cancel-operation"),getStatus:()=>e.ipcRenderer.invoke("get-status"),chooseDirectory:()=>e.ipcRenderer.invoke("choose-directory"),openDirectory:n=>e.ipcRenderer.invoke("open-directory",n),onProgress:n=>{let r=(o,t)=>n(t);return e.ipcRenderer.on("analysis:progress",r),()=>e.ipcRenderer.removeListener("analysis:progress",r)},getBackendStatus:()=>e.ipcRenderer.invoke("get-backend-status"),onBackendStatus:n=>{let r=(o,t)=>n(t);return e.ipcRenderer.on("backend:status",r),()=>e.ipcRenderer.removeListener("backend:status",r)}};e.contextBridge.exposeInMainWorld("directoryAnalyzer",s);
+"use strict";
+
+// electron/preload.ts
+var import_electron = require("electron");
+var api = {
+  // Operações de análise
+  listServerShares: (host) => import_electron.ipcRenderer.invoke("list-server-shares", host),
+  analyzeDirectory: (options) => import_electron.ipcRenderer.invoke("analyze-directory", options),
+  expandNode: (nodeId, depth) => import_electron.ipcRenderer.invoke("expand-node", nodeId, depth),
+  cancelOperation: () => import_electron.ipcRenderer.invoke("cancel-operation"),
+  // Controle e status
+  getStatus: () => import_electron.ipcRenderer.invoke("get-status"),
+  chooseDirectory: () => import_electron.ipcRenderer.invoke("choose-directory"),
+  openDirectory: (path) => import_electron.ipcRenderer.invoke("open-directory", path),
+  // Eventos
+  onProgress: (callback) => {
+    const listener = (_, progress) => callback(progress);
+    import_electron.ipcRenderer.on("analysis:progress", listener);
+    return () => import_electron.ipcRenderer.removeListener("analysis:progress", listener);
+  },
+  getBackendStatus: () => import_electron.ipcRenderer.invoke("get-backend-status"),
+  onBackendStatus: (callback) => {
+    const listener = (_, status) => callback(status);
+    import_electron.ipcRenderer.on("backend:status", listener);
+    return () => import_electron.ipcRenderer.removeListener("backend:status", listener);
+  }
+};
+import_electron.contextBridge.exposeInMainWorld("directoryAnalyzer", api);
+//# sourceMappingURL=preload.js.map

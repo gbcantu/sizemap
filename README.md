@@ -12,6 +12,7 @@ e se comunica com o Electron por mensagens JSON.
 
 - Analisa uma pasta local e mostra o tamanho total e a quantidade de arquivos.
 - Apresenta os itens do primeiro nível com tamanho, proporção e barras visuais.
+- Permite expandir pastas sob demanda para navegar por vários níveis.
 - Permite escolher a pasta pelo seletor do sistema ou informar seu caminho.
 - Exibe o progresso da análise e permite interrompê-la.
 
@@ -51,8 +52,14 @@ backend/   Serviço Python e lógica de análise
 frontend/  Interface React e aplicação Electron
 ```
 
+### Organização do frontend
+
+As telas ficam em `frontend/src/pages/` e os elementos reutilizáveis em
+`frontend/src/components/`. Cada arquivo de componente `.tsx` possui um arquivo
+`.styles.ts` correspondente com seus estilos em `styled-components`; não são
+usados arquivos CSS. O tema da aplicação é claro.
+
 ## Limitações conhecidas
 
-A análise inicial calcula a pasta raiz e seus itens de primeiro nível. A
-expansão de níveis adicionais ainda não está implementada no backend. A
-listagem de compartilhamentos de rede usa o comando `net view` do Windows.
+A interface carrega os filhos de cada pasta quando ela é expandida. A listagem
+de compartilhamentos de rede usa o comando `net view` do Windows.

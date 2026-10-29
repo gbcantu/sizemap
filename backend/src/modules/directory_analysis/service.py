@@ -1,6 +1,5 @@
 import os
 import re
-import time
 import subprocess
 from pathlib import Path
 from typing import Dict, List, Tuple, Optional, Callable
@@ -33,7 +32,9 @@ class DirectoryAnalysisService:
     """Serviço para análise de tamanho de diretórios."""
     
     def __init__(self):
-        self._results_cache: Dict[str, Dict] = {}  # cache de resultados
+        self._results_cache: Dict[str, Dict[str, Dict[str, int | bool]]] = {}
+        self._node_index: Dict[str, Tuple[str, str]] = {}
+        self._path_ids: Dict[Tuple[str, str], str] = {}
         self._node_counter = 0
         
     def _gerar_id(self) -> str:
@@ -84,41 +85,33 @@ class DirectoryAnalysisService:
     def analyze_directory(self, request: DirectoryAnalysisRequestDto,
                          stop_event: Optional[Event] = None,
                          progress_callback: Optional[Callable] = None) -> DirectoryAnalysisResultDto:
-        """Analisa um diretório recursivamente."""
-        caminho_raiz = request.path
-        throttle_ms = request.throttle_ms
-        max_depth = request.max_depth
-
+        """Calcula os resumos e prepara o primeiro nível da árvore."""
+        caminho_raiz = os.path.abspath(request.path)
         if not os.path.isdir(caminho_raiz):
             raise ValueError(f"Caminho não existe ou não é um diretório: {caminho_raiz}")
 
-        resultados: Dict = {}
-
-        # Calcular tamanho recursivo
-        total_size, total_files = self._calcular_tamanho_recursivo(
-            caminho_raiz, resultados, throttle_ms, stop_event, progress_callback, 0, max_depth
+        self._node_index.clear()
+        self._path_ids.clear()
+        self._results_cache.clear()
+        resultados: Dict[str, Dict[str, int | bool]] = {}
+        total_size, total_files = self._calcular_resumos(
+            caminho_raiz, resultados, stop_event, progress_callback
         )
-
-        # Armazenar no cache
         self._results_cache[caminho_raiz] = resultados
 
-        # Gerar todos os nós e mapear id por caminho
-        id_map: Dict[str, str] = {}  # caminho -> id
-        for caminho in resultados:
-            node_id = self._gerar_id()
-            id_map[caminho] = node_id
-
-        # Construir rootNode com filhos populados
-        root_node = self._criar_no_com_filhos(caminho_raiz, resultados, id_map, caminho_raiz)
-
-        # Construir todos os nós filhos diretos e populá-los no cache
-        # para que o frontend possa resolver os IDs
-        child_nodes = []
-        for caminho_filho in resultados.get(caminho_raiz, {}).get("filhos", []):
-            if caminho_filho in resultados and caminho_filho in id_map:
-                child_nodes.append(
-                    self._criar_no_com_filhos(caminho_filho, resultados, id_map, caminho_raiz)
-                )
+        root_id = self._get_node_id(caminho_raiz, caminho_raiz)
+        child_nodes = self._list_child_nodes(caminho_raiz, caminho_raiz, root_id)
+        root_node = DirectoryNodeDto(
+            id=root_id,
+            path=caminho_raiz,
+            name=Path(caminho_raiz).name or caminho_raiz,
+            is_directory=True,
+            size_bytes=total_size,
+            file_count=total_files,
+            has_children=bool(child_nodes),
+            parent_id=None,
+            children=[node.id for node in child_nodes],
+        )
 
         return DirectoryAnalysisResultDto(
             root_node=root_node,
@@ -127,108 +120,67 @@ class DirectoryAnalysisService:
             total_file_count=total_files,
             analyzed_paths=list(resultados.keys()),
         )
-    
+
     def expand_node(self, request: ExpandNodeRequestDto) -> ExpandNodeResultDto:
-        """Expande um nó (carrega subdiretórios)."""
-        # TODO: Implementar lazy loading baseado no cache
-        # Por enquanto retorna lista vazia
+        """Retorna os filhos diretos de um diretório já analisado."""
+        indexed_node = self._node_index.get(request.node_id)
+        if indexed_node is None:
+            raise ValueError("Diretório não encontrado; analise a pasta novamente.")
+        root_path, node_path = indexed_node
+        if not os.path.isdir(node_path):
+            raise ValueError("O caminho não existe mais ou não é um diretório.")
+
         return ExpandNodeResultDto(
             node_id=request.node_id,
-            children=[]
+            children=self._list_child_nodes(node_path, root_path, request.node_id),
         )
-    
-    def _calcular_tamanho_recursivo(self, caminho: str, resultados: Dict, throttle_ms: int,
-                                   stop_event: Optional[Event], progress_callback: Optional[Callable],
-                                   nivel: int, max_depth: int) -> Tuple[int, int]:
-        """Calcula tamanho total de um diretório."""
+
+    def _calcular_resumos(self, caminho: str, resultados: Dict[str, Dict[str, int | bool]],
+                         stop_event: Optional[Event],
+                         progress_callback: Optional[Callable]) -> Tuple[int, int]:
+        """Percorre a árvore uma vez e guarda o resumo de cada diretório."""
         tamanho_total = 0
         total_arquivos = 0
-        filhos = []
-        
         if stop_event and stop_event.is_set():
             return 0, 0
-        
+
         try:
             with os.scandir(caminho) as entradas:
                 entradas_list = list(entradas)
-                total_entradas = len(entradas_list)
-                
+                has_children = False
                 for i, entrada in enumerate(entradas_list):
                     if stop_event and stop_event.is_set():
-                        return tamanho_total, total_arquivos
-                    
-                    # Throttling: pausa entre operações
-                    if throttle_ms > 0:
-                        time.sleep(throttle_ms / 1000.0)
-                    
+                        break
                     try:
                         if entrada.is_file(follow_symlinks=False):
+                            has_children = True
                             tamanho = entrada.stat(follow_symlinks=False).st_size
                             tamanho_total += tamanho
                             total_arquivos += 1
-                            
-                            if nivel == 0:  # Primeiro nível
-                                resultados[entrada.path] = {
-                                    "tamanho": tamanho,
-                                    "arquivos": 1,
-                                    "filhos": [],
-                                    "is_file": True,
-                                }
-                                filhos.append(entrada.path)
-                                
                         elif entrada.is_dir(follow_symlinks=False):
-                            if nivel < max_depth:
-                                # Calcular recursivamente até a profundidade máxima
-                                tam_filho, arquivos_filho = self._calcular_tamanho_recursivo(
-                                    entrada.path, resultados, throttle_ms, stop_event,
-                                    progress_callback, nivel + 1, max_depth
-                                )
-                                tamanho_total += tam_filho
-                                total_arquivos += arquivos_filho
-                                
-                                if nivel == 0:  # Primeiro nível
-                                    resultados[entrada.path] = {
-                                        "tamanho": tam_filho,
-                                        "arquivos": arquivos_filho,
-                                        "filhos": [],
-                                        "is_file": False,
-                                    }
-                                    filhos.append(entrada.path)
-                            else:
-                                # Apenas soma tamanho sem detalhar
-                                tam_filho = self._tamanho_raso(entrada.path)
-                                tamanho_total += tam_filho
-                                resultados[entrada.path] = {
-                                    "tamanho": tam_filho,
-                                    "arquivos": 0,
-                                    "filhos": [],
-                                    "is_file": False,
-                                }
-                                filhos.append(entrada.path)
-                                
+                            has_children = True
+                            child_size, child_files = self._calcular_resumos(
+                                entrada.path, resultados, stop_event, progress_callback
+                            )
+                            tamanho_total += child_size
+                            total_arquivos += child_files
                     except (PermissionError, OSError):
-                        # Ignorar arquivos/pastas sem permissão
                         continue
-                    
-                    # Reportar progresso a cada 100 entradas
                     if progress_callback and i % 100 == 0:
                         progress_callback(
                             stage="analyze_directory",
                             completed=i,
-                            total=total_entradas,
+                            total=len(entradas_list),
                             message=f"Analisando: {Path(caminho).name}"
                         )
-                        
         except (PermissionError, OSError):
-            pass
-        
+            has_children = False
+
         resultados[caminho] = {
             "tamanho": tamanho_total,
             "arquivos": total_arquivos,
-            "filhos": filhos,
-            "is_file": False,
+            "has_children": has_children,
         }
-        
         if progress_callback:
             progress_callback(
                 stage="analyze_directory",
@@ -236,50 +188,52 @@ class DirectoryAnalysisService:
                 total=1,
                 message=f"Concluído: {Path(caminho).name}"
             )
-        
         return tamanho_total, total_arquivos
-    
-    def _tamanho_raso(self, caminho: str) -> int:
-        """Soma tamanho de todos os arquivos recursivamente sem guardar estrutura."""
-        tamanho = 0
+
+    def _get_node_id(self, root_path: str, node_path: str) -> str:
+        key = (root_path, node_path)
+        node_id = self._path_ids.get(key)
+        if node_id is None:
+            node_id = self._gerar_id()
+            self._path_ids[key] = node_id
+            self._node_index[node_id] = key
+        return node_id
+
+    def _list_child_nodes(self, parent_path: str, root_path: str,
+                          parent_id: str) -> List[DirectoryNodeDto]:
+        children = []
         try:
-            with os.scandir(caminho) as entradas:
-                for entrada in entradas:
+            with os.scandir(parent_path) as entries:
+                for entry in entries:
                     try:
-                        if entrada.is_file(follow_symlinks=False):
-                            tamanho += entrada.stat(follow_symlinks=False).st_size
-                        elif entrada.is_dir(follow_symlinks=False):
-                            tamanho += self._tamanho_raso(entrada.path)
+                        if entry.is_file(follow_symlinks=False):
+                            is_directory = False
+                            size = entry.stat(follow_symlinks=False).st_size
+                            file_count = 1
+                            has_children = False
+                        elif entry.is_dir(follow_symlinks=False):
+                            is_directory = True
+                            summary = self._results_cache[root_path].get(entry.path, {})
+                            size = int(summary.get("tamanho", 0))
+                            file_count = int(summary.get("arquivos", 0))
+                            has_children = bool(summary.get("has_children", False))
+                        else:
+                            continue
                     except (PermissionError, OSError):
                         continue
+
+                    node_id = self._get_node_id(root_path, entry.path)
+                    children.append(DirectoryNodeDto(
+                        id=node_id,
+                        path=entry.path,
+                        name=entry.name,
+                        is_directory=is_directory,
+                        size_bytes=size,
+                        file_count=file_count,
+                        has_children=has_children,
+                        parent_id=parent_id,
+                        children=[],
+                    ))
         except (PermissionError, OSError):
-            pass
-        return tamanho
-    
-    def _criar_no_com_filhos(self, caminho: str, resultados: Dict,
-                             id_map: Dict[str, str], caminho_raiz: str) -> DirectoryNodeDto:
-        """Cria um nó DTO com children populados a partir dos resultados já calculados."""
-        info = resultados.get(caminho, {"tamanho": 0, "arquivos": 0, "filhos": [], "is_file": False})
-        nome = Path(caminho).name or caminho
-        node_id = id_map[caminho]
-
-        parent_id = None
-        if caminho != caminho_raiz:
-            parent_path = str(Path(caminho).parent)
-            parent_id = id_map.get(parent_path)
-
-        # IDs dos filhos diretos
-        children_ids = [id_map[f] for f in info.get("filhos", []) if f in id_map]
-
-        return DirectoryNodeDto(
-            id=node_id,
-            path=caminho,
-            name=nome,
-            is_directory=not info.get("is_file", False),
-            size_bytes=info["tamanho"],
-            file_count=info["arquivos"],
-            has_children=bool(info.get("filhos")),
-            parent_id=parent_id,
-            children=children_ids,
-        )
-
+            return children
+        return children

@@ -185,7 +185,7 @@ function setupIpcHandlers() {
   });
 
   ipcMain.handle("expand-node", async (_, nodeId: string, depth?: number) => {
-    return backend.request("expand_node", { nodeId, depth });
+    return backend.request("expand_node", { node_id: nodeId, depth });
   });
 
   ipcMain.handle("cancel-operation", async () => {

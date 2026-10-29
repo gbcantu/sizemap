@@ -1,2 +1,227 @@
-"use strict";var k=Object.create;var g=Object.defineProperty;var b=Object.getOwnPropertyDescriptor;var j=Object.getOwnPropertyNames;var S=Object.getPrototypeOf,_=Object.prototype.hasOwnProperty;var A=(s,n,r,t)=>{if(n&&typeof n=="object"||typeof n=="function")for(let o of j(n))!_.call(s,o)&&o!==r&&g(s,o,{get:()=>n[o],enumerable:!(t=b(n,o))||t.enumerable});return s};var y=(s,n,r)=>(r=s!=null?k(S(s)):{},A(n||!s||!s.__esModule?g(r,"default",{value:s,enumerable:!0}):r,s));var e=require("electron"),v=require("node:child_process"),h=require("node:fs"),a=y(require("node:path")),w=y(require("node:readline")),P=require("node:crypto"),l=class{child;pending=new Map;projectRoot;pythonScript;backendArguments;executable;operationQueue=Promise.resolve();status={state:"starting",message:"Starting the Python analysis service"};stopping=!1;constructor(){this.projectRoot=e.app.isPackaged?process.resourcesPath:a.default.resolve(__dirname,"../.."),this.pythonScript=a.default.join(this.projectRoot,"backend","src","backend_orchestrator.py"),this.backendArguments=e.app.isPackaged?[]:[this.pythonScript];let n=process.env.DIRECTORY_ANALYZER_PYTHON||process.argv.find(t=>t.startsWith("--directory-analyzer-python="))?.split("=").slice(1).join("="),r=process.platform==="win32"?a.default.join(this.projectRoot,"backend","venv","Scripts","python.exe"):a.default.join(this.projectRoot,"backend","venv","bin","python");this.executable=e.app.isPackaged?a.default.join(process.resourcesPath,"backend","backend_orchestrator.exe"):n||((0,h.existsSync)(r)?r:process.platform==="win32"?"python":"python3"),this.stopping=!1,this.start(this.executable,this.backendArguments)}start(n,r){this.updateStatus("starting","Starting the Python analysis service");let t=(0,v.spawn)(n,r,{cwd:this.projectRoot,stdio:["pipe","pipe","pipe"],windowsHide:!0});this.child=t,w.default.createInterface({input:t.stdout}).on("line",i=>this.handleLine(i,t)),t.stderr.on("data",i=>console.error(`[python] ${i.toString().trimEnd()}`)),t.on("error",i=>{this.child===t&&(this.rejectAll(i),this.updateStatus("error",i.message))}),t.on("exit",(i,p)=>{if(this.child!==t)return;let d=`Python backend stopped (${p||i})`;this.rejectAll(new Error(d)),this.stopping||this.updateStatus("error",d)})}getStatus(){return this.status}request(n,r){let t=()=>{let i=(0,P.randomUUID)();return new Promise((p,d)=>{this.pending.set(i,{resolve:p,reject:d}),this.child.stdin.write(`${JSON.stringify({id:i,operation:n,payload:r})}
-`,u=>{u&&(this.pending.delete(i),d(u))})})},o=this.operationQueue.then(t,t);return this.operationQueue=o.then(()=>{},()=>{}),o}stop(){this.stopping=!0,this.child.kill()}handleLine(n,r){if(this.child!==r)return;let t;try{t=JSON.parse(n)}catch{console.error(`Invalid backend message: ${n}`);return}if(t.type==="progress"){for(let i of e.BrowserWindow.getAllWindows())i.webContents.send("analysis:progress",t.payload);return}if(t.type==="ready"){this.updateStatus("ready","Python analysis service is ready");return}if(!t.id)return;let o=this.pending.get(t.id);o&&(this.pending.delete(t.id),t.type==="error"?o.reject(new Error(t.error||"Backend operation failed")):o.resolve(t.payload))}rejectAll(n){for(let r of this.pending.values())r.reject(n);this.pending.clear()}updateStatus(n,r){this.status={state:n,message:r};for(let t of e.BrowserWindow.getAllWindows())t.webContents.send("backend:status",this.status)}},c=null,f;function R(){return process.platform==="win32"?a.default.join(e.app.isPackaged?process.resourcesPath:e.app.getAppPath(),"icon.ico"):a.default.join(e.app.getAppPath(),"assets","icon.png")}function m(){let s=R();c=new e.BrowserWindow({width:1180,height:820,minWidth:850,minHeight:620,icon:(0,h.existsSync)(s)?s:void 0,webPreferences:{nodeIntegration:!1,contextIsolation:!0,preload:a.default.join(__dirname,"preload.js")}}),e.app.isPackaged?c.loadFile(a.default.join(e.app.getAppPath(),"dist","index.html")):(c.loadURL("http://localhost:5173"),c.webContents.openDevTools()),c.on("closed",()=>{c=null})}function x(){let s=new l;e.ipcMain.handle("list-server-shares",async(n,r)=>s.request("list_server_shares",{host:r})),e.ipcMain.handle("analyze-directory",async(n,r)=>s.request("analyze_directory",r)),e.ipcMain.handle("expand-node",async(n,r,t)=>s.request("expand_node",{nodeId:r,depth:t})),e.ipcMain.handle("cancel-operation",async()=>s.request("cancel_operation",{})),e.ipcMain.handle("get-status",async()=>s.request("get_status",{})),e.ipcMain.handle("get-backend-status",async()=>s.getStatus()),e.ipcMain.handle("choose-directory",async()=>{let n=await e.dialog.showOpenDialog(c,{properties:["openDirectory"]});return n.canceled?null:n.filePaths[0]}),e.ipcMain.handle("open-directory",async(n,r)=>{e.shell.openPath(r)})}e.app.whenReady().then(()=>{m(),x(),e.app.on("activate",()=>{e.BrowserWindow.getAllWindows().length===0&&m()})});e.app.on("window-all-closed",()=>{process.platform!=="darwin"&&e.app.quit()});e.app.on("before-quit",()=>{f&&f.stop()});
+"use strict";
+var __create = Object.create;
+var __defProp = Object.defineProperty;
+var __getOwnPropDesc = Object.getOwnPropertyDescriptor;
+var __getOwnPropNames = Object.getOwnPropertyNames;
+var __getProtoOf = Object.getPrototypeOf;
+var __hasOwnProp = Object.prototype.hasOwnProperty;
+var __copyProps = (to, from, except, desc) => {
+  if (from && typeof from === "object" || typeof from === "function") {
+    for (let key of __getOwnPropNames(from))
+      if (!__hasOwnProp.call(to, key) && key !== except)
+        __defProp(to, key, { get: () => from[key], enumerable: !(desc = __getOwnPropDesc(from, key)) || desc.enumerable });
+  }
+  return to;
+};
+var __toESM = (mod, isNodeMode, target) => (target = mod != null ? __create(__getProtoOf(mod)) : {}, __copyProps(
+  // If the importer is in node compatibility mode or this is not an ESM
+  // file that has been converted to a CommonJS file using a Babel-
+  // compatible transform (i.e. "__esModule" has not been set), then set
+  // "default" to the CommonJS "module.exports" for node compatibility.
+  isNodeMode || !mod || !mod.__esModule ? __defProp(target, "default", { value: mod, enumerable: true }) : target,
+  mod
+));
+
+// electron/main.ts
+var import_electron = require("electron");
+var import_node_child_process = require("node:child_process");
+var import_node_fs = require("node:fs");
+var import_node_path = __toESM(require("node:path"));
+var import_node_readline = __toESM(require("node:readline"));
+var import_node_crypto = require("node:crypto");
+var PythonBackend = class {
+  child;
+  pending = /* @__PURE__ */ new Map();
+  projectRoot;
+  pythonScript;
+  backendArguments;
+  executable;
+  operationQueue = Promise.resolve();
+  status = {
+    state: "starting",
+    message: "Starting the Python analysis service"
+  };
+  stopping = false;
+  constructor() {
+    this.projectRoot = import_electron.app.isPackaged ? process.resourcesPath : import_node_path.default.resolve(__dirname, "../..");
+    this.pythonScript = import_node_path.default.join(this.projectRoot, "backend", "src", "backend_orchestrator.py");
+    this.backendArguments = import_electron.app.isPackaged ? [] : [this.pythonScript];
+    const configuredPython = process.env.DIRECTORY_ANALYZER_PYTHON || process.argv.find((argument) => argument.startsWith("--directory-analyzer-python="))?.split("=").slice(1).join("=");
+    const venvPython = process.platform === "win32" ? import_node_path.default.join(this.projectRoot, "backend", "venv", "Scripts", "python.exe") : import_node_path.default.join(this.projectRoot, "backend", "venv", "bin", "python");
+    this.executable = import_electron.app.isPackaged ? import_node_path.default.join(process.resourcesPath, "backend", "backend_orchestrator.exe") : configuredPython || ((0, import_node_fs.existsSync)(venvPython) ? venvPython : process.platform === "win32" ? "python" : "python3");
+    this.stopping = false;
+    this.start(this.executable, this.backendArguments);
+  }
+  start(command, args) {
+    this.updateStatus("starting", "Starting the Python analysis service");
+    const child = (0, import_node_child_process.spawn)(command, args, {
+      cwd: this.projectRoot,
+      stdio: ["pipe", "pipe", "pipe"],
+      windowsHide: true
+    });
+    this.child = child;
+    const lines = import_node_readline.default.createInterface({ input: child.stdout });
+    lines.on("line", (line) => this.handleLine(line, child));
+    child.stderr.on("data", (data) => console.error(`[python] ${data.toString().trimEnd()}`));
+    child.on("error", (error) => {
+      if (this.child !== child)
+        return;
+      this.rejectAll(error);
+      this.updateStatus("error", error.message);
+    });
+    child.on("exit", (code, signal) => {
+      if (this.child !== child)
+        return;
+      const message = `Python backend stopped (${signal || code})`;
+      this.rejectAll(new Error(message));
+      if (!this.stopping)
+        this.updateStatus("error", message);
+    });
+  }
+  getStatus() {
+    return this.status;
+  }
+  request(operation, payload) {
+    const execute = () => {
+      const id = (0, import_node_crypto.randomUUID)();
+      return new Promise((resolve, reject) => {
+        this.pending.set(id, { resolve, reject });
+        this.child.stdin.write(`${JSON.stringify({ id, operation, payload })}
+`, (error) => {
+          if (error) {
+            this.pending.delete(id);
+            reject(error);
+          }
+        });
+      });
+    };
+    const result = this.operationQueue.then(execute, execute);
+    this.operationQueue = result.then(() => void 0, () => void 0);
+    return result;
+  }
+  stop() {
+    this.stopping = true;
+    this.child.kill();
+  }
+  handleLine(line, source) {
+    if (this.child !== source)
+      return;
+    let message;
+    try {
+      message = JSON.parse(line);
+    } catch {
+      console.error(`Invalid backend message: ${line}`);
+      return;
+    }
+    if (message.type === "progress") {
+      for (const window of import_electron.BrowserWindow.getAllWindows()) {
+        window.webContents.send("analysis:progress", message.payload);
+      }
+      return;
+    }
+    if (message.type === "ready") {
+      this.updateStatus("ready", "Python analysis service is ready");
+      return;
+    }
+    if (!message.id)
+      return;
+    const pending = this.pending.get(message.id);
+    if (!pending)
+      return;
+    this.pending.delete(message.id);
+    if (message.type === "error")
+      pending.reject(new Error(message.error || "Backend operation failed"));
+    else
+      pending.resolve(message.payload);
+  }
+  rejectAll(error) {
+    for (const request of this.pending.values())
+      request.reject(error);
+    this.pending.clear();
+  }
+  updateStatus(state, message) {
+    this.status = { state, message };
+    for (const window of import_electron.BrowserWindow.getAllWindows()) {
+      window.webContents.send("backend:status", this.status);
+    }
+  }
+};
+var mainWindow = null;
+var backend;
+function getAppIconPath() {
+  return process.platform === "win32" ? import_node_path.default.join(import_electron.app.isPackaged ? process.resourcesPath : import_electron.app.getAppPath(), "icon.ico") : import_node_path.default.join(import_electron.app.getAppPath(), "assets", "icon.png");
+}
+function createWindow() {
+  const iconPath = getAppIconPath();
+  mainWindow = new import_electron.BrowserWindow({
+    width: 1180,
+    height: 820,
+    minWidth: 850,
+    minHeight: 620,
+    icon: (0, import_node_fs.existsSync)(iconPath) ? iconPath : void 0,
+    webPreferences: {
+      nodeIntegration: false,
+      contextIsolation: true,
+      preload: import_node_path.default.join(__dirname, "preload.js")
+    }
+  });
+  if (import_electron.app.isPackaged) {
+    mainWindow.loadFile(import_node_path.default.join(import_electron.app.getAppPath(), "dist", "index.html"));
+  } else {
+    mainWindow.loadURL("http://localhost:5173");
+    mainWindow.webContents.openDevTools();
+  }
+  mainWindow.on("closed", () => {
+    mainWindow = null;
+  });
+}
+function setupIpcHandlers() {
+  const backend2 = new PythonBackend();
+  import_electron.ipcMain.handle("list-server-shares", async (_, host) => {
+    return backend2.request("list_server_shares", { host });
+  });
+  import_electron.ipcMain.handle("analyze-directory", async (_, options) => {
+    return backend2.request("analyze_directory", options);
+  });
+  import_electron.ipcMain.handle("expand-node", async (_, nodeId, depth) => {
+    return backend2.request("expand_node", { node_id: nodeId, depth });
+  });
+  import_electron.ipcMain.handle("cancel-operation", async () => {
+    return backend2.request("cancel_operation", {});
+  });
+  import_electron.ipcMain.handle("get-status", async () => {
+    return backend2.request("get_status", {});
+  });
+  import_electron.ipcMain.handle("get-backend-status", async () => {
+    return backend2.getStatus();
+  });
+  import_electron.ipcMain.handle("choose-directory", async () => {
+    const result = await import_electron.dialog.showOpenDialog(mainWindow, {
+      properties: ["openDirectory"]
+    });
+    return result.canceled ? null : result.filePaths[0];
+  });
+  import_electron.ipcMain.handle("open-directory", async (_, path2) => {
+    import_electron.shell.openPath(path2);
+  });
+}
+import_electron.app.whenReady().then(() => {
+  createWindow();
+  setupIpcHandlers();
+  import_electron.app.on("activate", () => {
+    if (import_electron.BrowserWindow.getAllWindows().length === 0) {
+      createWindow();
+    }
+  });
+});
+import_electron.app.on("window-all-closed", () => {
+  if (process.platform !== "darwin") {
+    import_electron.app.quit();
+  }
+});
+import_electron.app.on("before-quit", () => {
+  if (backend) {
+    backend.stop();
+  }
+});
+//# sourceMappingURL=main.js.map
