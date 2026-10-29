@@ -1,0 +1,23 @@
+# Local development
+run_dev.sh
+backend/venv/
+backend/.venv/
+frontend/node_modules/
+
+# Build output
+backend/build/
+backend/dist/
+backend/*.spec
+frontend/dist/
+frontend/dist-electron/
+
+# Python
+__pycache__/
+*.py[cod]
+
+# Environment and editor files
+.env
+.env.*
+!.env.example
+.vscode/
+.idea/

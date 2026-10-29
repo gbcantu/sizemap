@@ -1,0 +1,14 @@
+# Dependências do Directory Analyzer Backend
+# Python 3.10+
+
+# Análise de diretórios
+# (não há dependências externas além da stdlib)
+
+# Para desenvolvimento
+# pip install pytest  # se quiser testes
+# pip install black   # se quiser formatação
+# pip install flake8  # se quiser linting
+
+# Observação: O projeto foi transformado de uma aplicação Tkinter
+# para uma arquitetura backend/frontend separada. As dependências
+# do Tkinter (ttkbootstrap) não são mais necessárias no backend.
