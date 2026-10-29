@@ -43,7 +43,7 @@ Para gerar apenas os arquivos estáticos da interface:
 cd frontend
 npm run build:vite
 ```
-
+\
 ## Estrutura
 
 ```text
