@@ -201,9 +201,25 @@ function setupIpcHandlers() {
   });
 
   ipcMain.handle("choose-directory", async () => {
-    const result = await dialog.showOpenDialog(mainWindow!, {
+    const window = mainWindow;
+    if (!window || window.isDestroyed()) {
+      throw new Error("A janela principal não está disponível para selecionar uma pasta.");
+    }
+
+    if (window.isMinimized()) window.restore();
+    window.show();
+    window.focus();
+
+    const result = await dialog.showOpenDialog(window, {
       properties: ["openDirectory"],
     });
+
+    if (!window.isDestroyed()) {
+      if (window.isMinimized()) window.restore();
+      window.show();
+      window.focus();
+    }
+
     return result.canceled ? null : result.filePaths[0];
   });
 
