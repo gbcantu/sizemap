@@ -22,11 +22,11 @@ jobs:
           - platform: Windows
             runner: windows-latest
             artifact: windows
-            artifact-path: frontend/dist-electron/*.exe
+            artifact-path: frontend/dist-electron/sizemap.exe
           - platform: Linux
             runner: ubuntu-latest
             artifact: linux
-            artifact-path: frontend/dist-electron/*.AppImage
+            artifact-path: frontend/dist-electron/sizemap.appimage
 
     steps:
       - name: Check out source
@@ -61,9 +61,52 @@ jobs:
         env:
           NODE_ENV: production
 
+      - name: Name Windows installer
+        if: matrix.platform == 'Windows'
+        shell: pwsh
+        run: |
+          $installer = Get-ChildItem frontend/dist-electron -Filter *.exe | Select-Object -First 1
+          if (-not $installer) { throw "Windows .exe installer was not generated." }
+          Rename-Item $installer.FullName sizemap.exe
+
+      - name: Name Linux installer
+        if: matrix.platform == 'Linux'
+        run: |
+          installer="$(find frontend/dist-electron -maxdepth 1 -type f -name '*.AppImage' -print -quit)"
+          if [ -z "$installer" ]; then
+            echo "Linux AppImage was not generated." >&2
+            exit 1
+          fi
+          mv "$installer" frontend/dist-electron/sizemap.appimage
+
       - name: Upload installer
         uses: actions/upload-artifact@v4
         with:
           name: sizemap-${{ matrix.artifact }}
           path: ${{ matrix.artifact-path }}
           if-no-files-found: error
+
+  release:
+    name: Publish GitHub Release
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - name: Download installers
+        uses: actions/download-artifact@v4
+        with:
+          pattern: sizemap-*
+          path: release-assets
+          merge-multiple: true
+
+      - name: Publish release with installers
+        uses: softprops/action-gh-release@v2
+        with:
+          name: SizeMap ${{ github.ref_name }}
+          generate_release_notes: true
+          files: |
+            release-assets/*.exe
+            release-assets/*.appimage

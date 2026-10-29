@@ -52,6 +52,15 @@ backend/   Serviço Python e lógica de análise
 frontend/  Interface React e aplicação Electron
 ```
 
+## Releases
+
+Para gerar uma versão publicada, crie e envie uma tag começando com `v` (por
+exemplo, `v1.0.0`). O GitHub Actions compila o instalador `.exe` para Windows e
+o `.appimage` para Linux e anexa os arquivos `sizemap.exe` e
+`sizemap.appimage` à página **Releases** do GitHub.
+Os mesmos instaladores também ficam disponíveis nos artefatos da execução do
+workflow.
+
 ### Organização do frontend
 
 As telas ficam em `frontend/src/pages/` e os elementos reutilizáveis em
