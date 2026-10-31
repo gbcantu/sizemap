@@ -40,6 +40,7 @@
   "build": {
     "appId": "com.example.directoryanalyzer",
     "productName": "Directory Analyzer",
+    "afterPack": "scripts/after-pack.js",
     "directories": {
       "output": "dist-electron"
     },

@@ -38,8 +38,11 @@ class PythonBackend {
     const venvPython = process.platform === "win32"
       ? path.join(this.projectRoot, "backend", "venv", "Scripts", "python.exe")
       : path.join(this.projectRoot, "backend", "venv", "bin", "python");
+    const packagedBackendName = process.platform === "win32"
+      ? "backend_orchestrator.exe"
+      : "backend_orchestrator";
     this.executable = app.isPackaged
-      ? path.join(process.resourcesPath, "backend", "backend_orchestrator.exe")
+      ? path.join(process.resourcesPath, "backend", packagedBackendName)
       : configuredPython || (existsSync(venvPython)
         ? venvPython
         : process.platform === "win32" ? "python" : "python3");
