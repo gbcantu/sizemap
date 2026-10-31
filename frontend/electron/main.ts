@@ -5,6 +5,10 @@ import path from "node:path";
 import readline from "node:readline";
 import { randomUUID } from "node:crypto";
 
+if (process.platform === "linux") {
+  app.commandLine.appendSwitch("no-sandbox");
+}
+
 type PendingRequest = {
   resolve: (value: unknown) => void;
   reject: (error: Error) => void;
