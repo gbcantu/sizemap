@@ -1,6 +1,6 @@
 {
-  "name": "directory-analyzer",
-  "version": "1.0.0",
+  "name": "sizemap",
+  "version": "0.0.3",
   "description": "Directory size analyzer with Electron frontend and Python backend",
   "main": "electron/main.js",
   "scripts": {
@@ -57,9 +57,18 @@
         "filter": [
           "backend_orchestrator*"
         ]
+      },
+      {
+        "from": "build/icons/icon.ico",
+        "to": "icon.ico"
+      },
+      {
+        "from": "build/icons/icon.png",
+        "to": "icon.png"
       }
     ],
     "win": {
+      "icon": "build/icons/icon.ico",
       "target": "nsis"
     },
     "nsis": {
@@ -67,6 +76,7 @@
       "allowToChangeInstallationDirectory": true
     },
     "linux": {
+      "icon": "build/icons/icon.png",
       "target": "AppImage"
     },
     "appImage": {
@@ -74,5 +84,10 @@
         "--no-sandbox"
       ]
     }
+  },
+  "allowScripts": {
+    "electron@28.3.3": true,
+    "esbuild@0.20.2": true,
+    "esbuild@0.21.5": true
   }
 }

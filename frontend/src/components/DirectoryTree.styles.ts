@@ -72,7 +72,7 @@ export const TreeRow = styled.div<{ $selected: boolean }>`
   transition: background 100ms ease;
 
   &:hover {
-    background: ${({ $selected }) => $selected ? '#e5efff' : colors.surfaceSubtle};
+    background: ${({ $selected }) => $selected ? colors.accentSoftHover : colors.surfaceSubtle};
   }
 
   @media (max-width: 700px) {

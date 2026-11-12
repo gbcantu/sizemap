@@ -146,9 +146,11 @@ let mainWindow: BrowserWindow | null = null;
 let backend: PythonBackend;
 
 function getAppIconPath() {
-  return process.platform === "win32"
-    ? path.join(app.isPackaged ? process.resourcesPath : app.getAppPath(), "icon.ico")
-    : path.join(app.getAppPath(), "assets", "icon.png");
+  const iconName = process.platform === "win32" ? "icon.ico" : "icon.png";
+  const iconDirectory = app.isPackaged
+    ? process.resourcesPath
+    : path.join(app.getAppPath(), "build", "icons");
+  return path.join(iconDirectory, iconName);
 }
 
 function createWindow() {

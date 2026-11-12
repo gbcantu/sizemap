@@ -1,5 +1,6 @@
 import type { KeyboardEvent } from 'react'
 import type { BackendRuntimeStatus } from '../types/directory'
+import logo from '../assets/logo.png'
 import {
   Actions,
   AnalyzeButton,
@@ -39,13 +40,7 @@ export default function AnalysisToolbar({
     <Header>
       <ToolbarContent>
         <Brand>
-          <BrandMark aria-hidden="true">
-            <svg viewBox="0 0 24 24" fill="none">
-              <path d="M3.5 7.5h6l2 2h9v9h-17z" />
-              <path d="M3.5 7.5v-2h6l2 2" />
-            </svg>
-          </BrandMark>
-          <span>SizeMap</span>
+          <BrandMark src={logo} alt="SizeMap" />
         </Brand>
 
         <PathInput

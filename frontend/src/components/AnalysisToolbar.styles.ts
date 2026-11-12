@@ -39,23 +39,12 @@ export const Brand = styled.div`
   letter-spacing: -0.6px;
 `
 
-export const BrandMark = styled.div`
-  display: grid;
-  width: 38px;
-  height: 38px;
-  place-items: center;
-  border-radius: 12px;
-  background: ${colors.accentSoft};
-  color: ${colors.accent};
-
-  svg {
-    width: 23px;
-    height: 23px;
-    stroke: currentColor;
-    stroke-linecap: round;
-    stroke-linejoin: round;
-    stroke-width: 1.7;
-  }
+export const BrandMark = styled.img`
+  display: block;
+  width: 48px;
+  height: 48px;
+  flex-shrink: 0;
+  object-fit: contain;
 `
 
 export const PathInput = styled.input`
